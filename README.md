@@ -36,7 +36,16 @@ Or add it directly in Xcode:
 
 ## Getting Started
 
-### 1. Initialize SharePlay
+### 1. Configure Your Project
+
+**IMPORTANT**: You must add the SharePlay entitlement to your Xcode project:
+1. Select your project in Xcode
+2. Select your target
+3. Go to "Signing & Capabilities"
+4. Click "+" and add "SharePlay"
+5. Ensure your provisioning profile includes SharePlay entitlement
+
+### 2. Initialize SharePlay
 
 ```swift
 import DicyaninSharePlay
@@ -51,7 +60,7 @@ struct ContentView: View {
 }
 ```
 
-### 2. Configure Your ImmersiveView
+### 3. Configure Your ImmersiveView
 
 ```swift
 struct ImmersiveView: View {
@@ -96,77 +105,96 @@ struct ImmersiveView: View {
 }
 ```
 
-### 3. Send Messages
+### 4. Add SharePlay Status and Player Management
 
 ```swift
-// Send entity transform updates
-let message = EntityTransformMessage(
-    entityId: entity.id.description,
-    position: entity.position,
-    rotation: entity.orientation,
-    scale: entity.scale
-)
-SharePlayManager.sendMessage(message: message)
-
-// Send entity state changes
-let message = EntityStateMessage(
-    entityId: entity.id.description,
-    isActive: true, // or false for deletion
-    modelName: "YourModelName"
-)
-SharePlayManager.sendMessage(message: message)
-```
-
-## Custom Message Types
-
-To create a custom message type:
-
-1. Create a new struct conforming to `SharePlayMessage`:
-
-```swift
-struct CustomMessage: SharePlayMessage {
-    var windowId: String = ""
-    var messageId: String = UUID().uuidString
-    
-    // Add your custom properties
-    let customData: String
-}
-```
-
-2. Add the message type to `AnySharePlayMessage`:
-
-```swift
-private enum MessageType: String, Codable {
-    // ... existing cases ...
-    case customMessage
-}
-
-// In encode method:
-case is CustomMessage:
-    try container.encode(MessageType.customMessage, forKey: .type)
-
-// In init(from:) method:
-case .customMessage:
-    base = try JSONDecoder().decode(CustomMessage.self, from: data)
-```
-
-3. Create a handler:
-
-```swift
-class CustomMessageHandler: SharePlayMessageHandler {
-    typealias MessageType = CustomMessage
-    
-    private let onMessageReceived: (CustomMessage) -> Void
-    
-    init(onMessageReceived: @escaping (CustomMessage) -> Void) {
-        self.onMessageReceived = onMessageReceived
-    }
-    
-    func handle(_ message: CustomMessage, from sender: Participant) async {
-        onMessageReceived(message)
+struct ContentView: View {
+    var body: some View {
+        VStack {
+            // SharePlay status and controls
+            DicyaninSharePlayStatusView()
+                .frame(maxWidth: 300)
+            
+            // Player name editor
+            PlayerNameEditor()
+                .frame(maxWidth: 300)
+            
+            // Active players list
+            PlayerListView()
+                .frame(maxWidth: 300)
+        }
     }
 }
 ```
+
+## Components
+
+### DicyaninSharePlayStatusView
+A view that displays the current SharePlay session status and provides controls to start/stop the session.
+- Shows active/inactive status with appropriate icons
+- Provides prominent "Start SharePlay" button when inactive
+- Shows destructive "Leave SharePlay" button when active
+- Automatically updates when session state changes
+
+### PlayerNameEditor
+A view that allows users to set and edit their player name.
+- Shows current player name or "Set your name" prompt
+- Provides inline editing with validation
+- Automatically syncs name changes across SharePlay session
+
+### PlayerListView
+A view that displays all active players in the SharePlay session.
+- Shows player names with ready status
+- Indicates local player with "(You)" label
+- Updates automatically when players join/leave
+- Uses modern translucent design
+
+## Message Types
+
+### Player
+Represents a player in the SharePlay session with properties:
+- `name`: Player's display name
+- `id`: Unique identifier
+- `score`: Current score
+- `isActive`: Whether player is active
+- `isReady`: Player's ready status
+- `isVisionDevice`: Whether player is on visionOS
+- `playerSeat`: Assigned seat number
+
+### EntityTransformMessage
+For syncing 3D entity transformations:
+- `entityId`: Target entity identifier
+- `position`: SIMD3<Float> position
+- `rotation`: simd_quatf rotation
+- `scale`: SIMD3<Float> scale
+
+### EntityStateMessage
+For syncing entity creation/deletion:
+- `entityId`: Target entity identifier
+- `isActive`: Whether entity should be active
+- `modelName`: Name of the model to load
+
+## Best Practices
+
+1. **Session Management**
+   - Always check session state before sending messages
+   - Handle session cleanup properly when leaving
+   - Use appropriate error handling for session operations
+
+2. **Player Management**
+   - Update player state through PlayerManager
+   - Handle player disconnections gracefully
+   - Validate player data before sending
+
+3. **Message Handling**
+   - Use appropriate message types for different data
+   - Handle message delivery failures
+   - Consider message ordering for critical updates
+
+4. **UI Updates**
+   - Use ObservableObject for state management
+   - Update UI on the main thread
+   - Handle edge cases (no players, disconnected, etc.)
 
 ## License
 

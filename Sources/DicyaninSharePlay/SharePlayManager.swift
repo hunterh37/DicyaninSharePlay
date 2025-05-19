@@ -16,25 +16,30 @@ public class SharePlayManager: ObservableObject {
     private init() {}
     
     public func startSharePlay() {
+        print("📱 [SharePlay] Starting SharePlay")
         Task {
             do {
                 let activity = MyGroupActivity()
+                print("📱 [SharePlay] Activating activity")
                 let _ = try await activity.activate()
+                print("📱 [SharePlay] Activity activated successfully")
             } catch {
-                print("Failed to start SharePlay: \(error.localizedDescription)")
+                print("📱 [SharePlay] Failed to start SharePlay: \(error.localizedDescription)")
             }
         }
     }
     
     public func configureSession(_ session: GroupSession<MyGroupActivity>) {
+        print("📱 [SharePlay] Configuring session")
         self.cleanup()
         
         Task { @MainActor in
             try await Task.sleep(nanoseconds: 1000000000)
-            joinSession(session: session)
+            await joinSession(session: session)
         }
         
         session.$state.sink { [weak self] state in
+            print("📱 [SharePlay] Session state changed: \(state)")
             switch state {
             case .invalidated: self?.cleanup()
             default:
@@ -43,10 +48,12 @@ public class SharePlayManager: ObservableObject {
         }.store(in: &cancellables)
     }
     
-    public func joinSession(session: GroupSession<MyGroupActivity>) {
-        Task { @MainActor in
-            sessionInfo = .init(newSession: session)
-            try await Task.sleep(nanoseconds: 1000000000)
+    public func joinSession(session: GroupSession<MyGroupActivity>) async {
+        print("📱 [SharePlay] Joining session")
+        await MainActor.run {
+            let newSessionInfo = DemoSessionInfo(newSession: session)
+            self.sessionInfo = newSessionInfo
+            print("📱 [SharePlay] Session joined successfully")
             
             SharePlayManager.subscribeToSessionUpdates()
             SharePlayManager.subscribeToPlayerUpdates()
@@ -56,18 +63,20 @@ public class SharePlayManager: ObservableObject {
     }
     
     public static func subscribeToSessionUpdates() {
-        if let messenger = SharePlayManager.shared.sessionInfo.messenger {
-            var task = Task { @MainActor in
-                for await (anyMessage, sender) in messenger.messages(of: AnySharePlayMessage.self) {
-                    await MessageHandlerRegistry.shared.handle(anyMessage.base, from: sender.source)
-                }
+        guard let messenger = SharePlayManager.shared.sessionInfo.messenger else { return }
+        
+        Task { @MainActor in
+            for await (anyMessage, sender) in messenger.messages(of: AnySharePlayMessage.self) {
+                await MessageHandlerRegistry.shared.handle(anyMessage.base, from: sender.source)
             }
         }
     }
     
     public static func subscribeToPlayerUpdates() {
         guard let newSession = SharePlayManager.shared.sessionInfo.session else {
-            print("failed to get session"); return }
+            print("📱 [SharePlay] Failed to get session")
+            return
+        }
         
         newSession.$activeParticipants.sink { activeParticipants in
             let localId = newSession.localParticipant.id
@@ -138,18 +147,22 @@ public class SharePlayManager: ObservableObject {
             let everyoneElse = session.activeParticipants.subtracting([session.localParticipant])
             let newMessage = AnySharePlayMessage(message)
             messenger.send(newMessage, to: .only(participants ?? everyoneElse)) { error in
-                if let error = error { print("Error sending \(message.self) Message: \(error)") }
+                if let error = error { print("📱 [SharePlay] Error sending \(message.self) Message: \(error)") }
             }
         }
     }
     
     public func cleanup() {
-        SharePlayManager.shared.sessionInfo.session?.leave()
-        SharePlayManager.shared.sessionInfo.session = nil
-        sessionInfo.session = nil
-        sessionInfo.messenger = nil
-        sessionInfo = .init()
-        cancellables.removeAll()
+        print("📱 [SharePlay] Cleaning up session")
+        Task { @MainActor in
+            SharePlayManager.shared.sessionInfo.session?.leave()
+            SharePlayManager.shared.sessionInfo.session = nil
+            sessionInfo.session = nil
+            sessionInfo.messenger = nil
+            sessionInfo = .init()
+            cancellables.removeAll()
+            print("📱 [SharePlay] Cleanup complete")
+        }
     }
 }
 
@@ -182,8 +195,5 @@ public class DemoSessionInfo: ObservableObject {
         self.session = newSession
         self.messenger = GroupSessionMessenger(session: newSession, deliveryMode: .reliable)
         self.reliableMessenger = GroupSessionMessenger(session: newSession, deliveryMode: .unreliable)
-        Task { @MainActor in
-            SharePlayManager.shared.sessionInfo = self
-        }
     }
 } 
