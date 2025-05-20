@@ -24,30 +24,68 @@ public struct AnySharePlayMessage: Codable {
         case type
     }
 
+    private enum MessageType: String, Codable {
+        case playerMessage
+        case playerReadyMessage
+        case game_StartMessage
+        case entityTransformMessage
+        case entityStateMessage
+        case customMessage
+    }
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         
-        // Get the type identifier from the registry
-        guard let typeIdentifier = MessageRegistry.shared.typeIdentifier(for: base) else {
-            throw EncodingError.invalidValue(base, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Error encoding AnySharePlayMessage: Unregistered type"))
+        // First try built-in types
+        switch base {
+        case is Player:
+            try container.encode(MessageType.playerMessage, forKey: .type)
+        case is PlayerReadyMessage:
+            try container.encode(MessageType.playerReadyMessage, forKey: .type)
+        case is Game_StartMessage:
+            try container.encode(MessageType.game_StartMessage, forKey: .type)
+        case is EntityTransformMessage:
+            try container.encode(MessageType.entityTransformMessage, forKey: .type)
+        case is EntityStateMessage:
+            try container.encode(MessageType.entityStateMessage, forKey: .type)
+        default:
+            // If not a built-in type, try to get from registry
+            if let typeIdentifier = MessageRegistry.shared.typeIdentifier(for: base) {
+                try container.encode(MessageType.customMessage, forKey: .type)
+                try container.encode(typeIdentifier, forKey: .customType)
+            } else {
+                throw EncodingError.invalidValue(base, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Error encoding AnySharePlayMessage: Unregistered type"))
+            }
         }
         
-        try container.encode(typeIdentifier, forKey: .type)
         let data = try JSONEncoder().encode(base)
         try container.encode(data, forKey: .base)
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeIdentifier = try container.decode(String.self, forKey: .type)
+        let type = try container.decode(MessageType.self, forKey: .type)
         let data = try container.decode(Data.self, forKey: .base)
 
-        // Get the type from the registry
-        guard let type = MessageRegistry.shared.type(for: typeIdentifier) else {
-            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown message type: \(typeIdentifier)")
+        switch type {
+        case .playerMessage:
+            base = try JSONDecoder().decode(Player.self, from: data)
+        case .playerReadyMessage:
+            base = try JSONDecoder().decode(PlayerReadyMessage.self, from: data)
+        case .game_StartMessage:
+            base = try JSONDecoder().decode(Game_StartMessage.self, from: data)
+        case .entityTransformMessage:
+            base = try JSONDecoder().decode(EntityTransformMessage.self, from: data)
+        case .entityStateMessage:
+            base = try JSONDecoder().decode(EntityStateMessage.self, from: data)
+        case .customMessage:
+            // For custom messages, we need the type identifier
+            let typeIdentifier = try container.decode(String.self, forKey: .customType)
+            guard let messageType = MessageRegistry.shared.type(for: typeIdentifier) else {
+                throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown custom message type: \(typeIdentifier)")
+            }
+            base = try JSONDecoder().decode(messageType, from: data)
         }
-        
-        base = try JSONDecoder().decode(type, from: data)
     }
 }
 
@@ -63,12 +101,12 @@ public class MessageRegistry {
         register(Player.self, typeIdentifier: "playerMessage")
         register(PlayerReadyMessage.self, typeIdentifier: "playerReadyMessage")
         register(Game_StartMessage.self, typeIdentifier: "game_StartMessage")
-        register(Game_SendHeartMessage.self, typeIdentifier: "game_SendHeartMessage")
         register(EntityTransformMessage.self, typeIdentifier: "entityTransformMessage")
         register(EntityStateMessage.self, typeIdentifier: "entityStateMessage")
     }
     
     public func register<T: SharePlayMessage>(_ type: T.Type, typeIdentifier: String) {
+        print("📱 [SharePlay] Registering message type: \(typeIdentifier)")
         typeMap[typeIdentifier] = type
     }
     
@@ -98,26 +136,6 @@ public struct Game_StartMessage: Codable, Sendable, Identifiable, Equatable, Sha
         self.messageId = messageId
         self.id = id
         self.gameMode = gameMode
-    }
-}
-
-public struct Game_SendHeartMessage: Codable, Sendable, Identifiable, Equatable, SharePlayMessage {
-    public let id: UUID
-    public let seatNumber: Int
-    public let heartHeight: Float
-    public var windowId: String = ""
-    public var messageId: String = UUID().uuidString
-    
-    public init(windowId: String, messageId: String, id: UUID, seatNumber: Int, heartHeight: Float) {
-        self.windowId = windowId
-        self.messageId = messageId
-        self.id = id
-        self.seatNumber = seatNumber
-        self.heartHeight = heartHeight
-    }
-    
-    public static func == (lhs: Game_SendHeartMessage, rhs: Game_SendHeartMessage) -> Bool {
-        lhs.id == rhs.id
     }
 }
 
