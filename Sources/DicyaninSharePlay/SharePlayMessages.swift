@@ -22,6 +22,7 @@ public struct AnySharePlayMessage: Codable {
     private enum CodingKeys: String, CodingKey {
         case base
         case type
+        case customType
     }
 
     private enum MessageType: String, Codable {
