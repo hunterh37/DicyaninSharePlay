@@ -42,8 +42,8 @@ Or add it directly in Xcode:
 1. Select your project in Xcode
 2. Select your target
 3. Go to "Signing & Capabilities"
-4. Click "+" and add "SharePlay"
-5. Ensure your provisioning profile includes SharePlay entitlement
+4. Click "+" and add "GroupActivities"
+5. Ensure your provisioning profile includes GroupActivities/SharePlay entitlement
 
 ### 2. Initialize SharePlay
 
@@ -208,7 +208,7 @@ Hunter Harris
 
 ### Basic Setup
 
-1. Add the SharePlay entitlement to your app's target
+1. Add the GroupActivities entitlement to your app's target
 2. Import the package in your app
 3. Use the provided views and managers
 
