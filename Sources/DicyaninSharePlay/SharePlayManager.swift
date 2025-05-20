@@ -12,8 +12,22 @@ public class SharePlayManager: ObservableObject {
     
     @Published public var sessionInfo: DemoSessionInfo = .init()
     private var cancellables = Set<AnyCancellable>()
+    private var sessionListener: Task<Void, Never>?
     
-    private init() {}
+    private init() {
+        print("📱 [SharePlay] Initializing SharePlayManager")
+        setupSessionListener()
+    }
+    
+    private func setupSessionListener() {
+        print("📱 [SharePlay] Setting up session listener")
+        sessionListener = Task {
+            for await newSession in MyGroupActivity.sessions() {
+                print("📱 [SharePlay] Received new session")
+                await configureSession(newSession)
+            }
+        }
+    }
     
     public func startSharePlay() {
         print("📱 [SharePlay] Starting SharePlay")
@@ -171,6 +185,10 @@ public class SharePlayManager: ObservableObject {
             cancellables.removeAll()
             print("📱 [SharePlay] Cleanup complete")
         }
+    }
+    
+    deinit {
+        sessionListener?.cancel()
     }
 }
 
