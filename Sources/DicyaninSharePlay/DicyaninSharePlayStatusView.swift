@@ -5,7 +5,7 @@ import SwiftUI
 import GroupActivities
 
 public struct DicyaninSharePlayStatusView: View {
-    @StateObject private var sharePlayManager = SharePlayManager.shared
+    @ObservedObject private var sharePlayManager = SharePlayManager.shared
     
     public init() {}
     

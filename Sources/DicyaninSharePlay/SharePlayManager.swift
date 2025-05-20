@@ -41,9 +41,15 @@ public class SharePlayManager: ObservableObject {
         session.$state.sink { [weak self] state in
             print("📱 [SharePlay] Session state changed: \(state)")
             switch state {
-            case .invalidated: self?.cleanup()
-            default:
-                break
+            case .invalidated: 
+                print("📱 [SharePlay] Session invalidated, cleaning up")
+                self?.cleanup()
+            case .waiting:
+                print("📱 [SharePlay] Session waiting")
+            case .joined:
+                print("📱 [SharePlay] Session joined")
+            @unknown default:
+                print("📱 [SharePlay] Unknown session state: \(state)")
             }
         }.store(in: &cancellables)
     }
@@ -52,13 +58,15 @@ public class SharePlayManager: ObservableObject {
         print("📱 [SharePlay] Joining session")
         await MainActor.run {
             let newSessionInfo = DemoSessionInfo(newSession: session)
+            print("📱 [SharePlay] Created new session info")
             self.sessionInfo = newSessionInfo
-            print("📱 [SharePlay] Session joined successfully")
+            print("📱 [SharePlay] Updated session info, session: \(String(describing: sessionInfo.session))")
             
             SharePlayManager.subscribeToSessionUpdates()
             SharePlayManager.subscribeToPlayerUpdates()
             
             session.join()
+            print("📱 [SharePlay] Called session.join()")
         }
     }
     
@@ -190,10 +198,28 @@ public class DemoSessionInfo: ObservableObject {
     public var reliableMessenger: GroupSessionMessenger?
     public var journal: GroupSessionJournal?
     
-    public init() { }
+    public init() {
+        print("📱 [SharePlay] Created empty DemoSessionInfo")
+    }
+    
     public init(newSession: GroupSession<MyGroupActivity>) {
+        print("📱 [SharePlay] Creating DemoSessionInfo with session")
         self.session = newSession
         self.messenger = GroupSessionMessenger(session: newSession, deliveryMode: .reliable)
         self.reliableMessenger = GroupSessionMessenger(session: newSession, deliveryMode: .unreliable)
+        print("📱 [SharePlay] DemoSessionInfo initialized with session: \(String(describing: session))")
+    }
+    
+    public func updateSession(_ newSession: GroupSession<MyGroupActivity>?) {
+        print("📱 [SharePlay] Updating session in DemoSessionInfo")
+        self.session = newSession
+        if let session = newSession {
+            self.messenger = GroupSessionMessenger(session: session, deliveryMode: .reliable)
+            self.reliableMessenger = GroupSessionMessenger(session: session, deliveryMode: .unreliable)
+        } else {
+            self.messenger = nil
+            self.reliableMessenger = nil
+        }
+        print("📱 [SharePlay] Session updated: \(String(describing: session))")
     }
 } 

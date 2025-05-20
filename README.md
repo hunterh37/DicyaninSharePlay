@@ -203,3 +203,96 @@ Copyright © 2025 Dicyanin Labs. All rights reserved.
 ## Author
 
 Hunter Harris 
+
+## Usage
+
+### Basic Setup
+
+1. Add the SharePlay entitlement to your app's target
+2. Import the package in your app
+3. Use the provided views and managers
+
+### SharePlay Status View
+
+```swift
+import DicyaninSharePlay
+
+struct ContentView: View {
+    var body: some View {
+        DicyaninSharePlayStatusView()
+    }
+}
+```
+
+### Player List View
+
+```swift
+import DicyaninSharePlay
+
+struct ContentView: View {
+    var body: some View {
+        PlayerListView()
+    }
+}
+```
+
+### Custom Message Types
+
+You can create and register your own SharePlay message types. Here's how:
+
+1. Create a message type that conforms to `SharePlayMessage`:
+
+```swift
+struct CustomGameMessage: Codable, Sendable, Identifiable, Equatable, SharePlayMessage {
+    public var windowId: String = ""
+    public var messageId: String = UUID().uuidString
+    public let id: UUID
+    public let customData: String
+    
+    public static func == (lhs: CustomGameMessage, rhs: CustomGameMessage) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+```
+
+2. Register your message type in your app's initialization:
+
+```swift
+// In your app's initialization code (e.g., App.swift)
+@main
+struct YourApp: App {
+    init() {
+        // Register custom message types
+        MessageRegistry.shared.register(CustomGameMessage.self, typeIdentifier: "customGameMessage")
+    }
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+```
+
+3. Use your custom message type:
+
+```swift
+// Sending a custom message
+let message = CustomGameMessage(
+    windowId: "main",
+    messageId: UUID().uuidString,
+    id: UUID(),
+    customData: "Hello SharePlay!"
+)
+SharePlayManager.sendMessage(message: message)
+```
+
+### Built-in Message Types
+
+The package includes several built-in message types:
+- `Player`: Player information
+- `PlayerReadyMessage`: Player ready status
+- `Game_StartMessage`: Game start notification
+- `Game_SendHeartMessage`: Heart synchronization
+- `EntityTransformMessage`: Entity transform updates
+- `EntityStateMessage`: Entity state updates 
